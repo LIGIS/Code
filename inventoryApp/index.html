@@ -1,0 +1,214 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <!--The viewport meta tag is used to improve the presentation and behavior of the samples
+      on iOS devices-->
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no">
+    <title></title>
+
+    <!--Current style sheets for arcgis. claro is the theme-->
+    <link rel="stylesheet" href="http://js.arcgis.com/3.11/dijit/themes/claro/claro.css">
+    <link rel="stylesheet" href="http://js.arcgis.com/3.11/esri/css/esri.css">
+
+    <!--Needed for the left expando pane-->
+    <link rel="stylesheet" type="text/css" href="styles/expandoPane.css" />
+
+    <!--user defined styles-->
+    <link rel="stylesheet" type="text/css" href="styles/Page.css" />
+
+    <!-- API -->
+    <script src="http://js.arcgis.com/3.11/"></script>
+    <!-- Google StreetView -->
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false"></script> 
+    <script type="text/javascript" src="javascript/googleStreetView.js"></script>
+    <!-- Utilities -->
+    <script type="text/javascript" src="javascript/pageUtilities.js"></script>
+    <script type="text/javascript" src="javascript/identify.js"></script>
+    <script type="text/javascript" src="javascript/editor.js"></script>
+    <script type="text/javascript" src="javascript/credentials.js"></script>
+    <script type="text/javascript" src="javascript/httpRequest.js"></script>
+    <script type="text/javascript" src="javascript/addpointLayer.js"></script>
+
+    <script>
+        var map, veTileLayer, clickHandler, gsvc, dialog;
+        require([
+          "esri/map", "esri/layers/FeatureLayer", "esri/dijit/Legend", "esri/geometry/Extent", "esri/layers/ArcGISDynamicMapServiceLayer", "esri/dijit/Geocoder","esri/layers/GraphicsLayer",
+
+          "dojo/_base/array", "dojo/parser",
+
+          "dijit/layout/BorderContainer", "dijit/layout/ContentPane", "dijit/form/DropDownButton", "dijit/Menu", "dijit/MenuItem", "dojox/layout/ExpandoPane", "dijit/CheckedMenuItem", "esri/tasks/IdentifyTask", "dijit/form/DateTextBox",
+          "esri/tasks/IdentifyParameters", "dijit/MenuSeparator", "dojox/data/QueryReadStore", "esri/toolbars/draw", "dijit/form/NumberTextBox", "dijit/form/CheckBox", "dojo/dnd/Moveable", "dijit/form/ToggleButton",
+          "dijit/layout/AccordionContainer", "dojo/domReady!"
+        ], function (
+          Map, FeatureLayer, Legend, Extent, ArcGISDynamicMapServiceLayer, Geocoder, GraphicsLayer, 
+          arrayUtils, parser
+        ) {
+            parser.parse();
+
+            //town of southampton extent in ft
+            startExtent = new Extent({
+                "xmin": 1297232.4692940111,
+                "ymin": 223864.66964762594,
+                "xmax": 1501876.5665162336,
+                "ymax": 325535.6765920704,
+                "spatialReference": { "wkid": 102718 }
+            });
+            map = new esri.Map("map", {
+                logo: false,
+                extent: startExtent,
+                sliderOrientation: "horizontal"
+            });
+
+            //sets the extent for the geocoder to search
+            var coderExtent = new Extent({
+                "xmin": -8138326,
+                "ymin": 4963400,
+                "xmax": -7991567,
+                "ymax": 5033875,
+                "spatialReference": { "wkid": 102100 }
+            });
+            //define the geocoder from arc map
+            geocoder = new Geocoder({
+                map: map,
+                arcgisGeocoder: { placeholder: "Find a place" },
+                highlightLocation: true,
+                showResults: true,
+                searchExtent: coderExtent,
+                autoComplete: true
+            }, "search");
+            geocoder.startup();
+
+            //geometry service used to conver coordinates to 4326 to use in Streetview
+            gsvc = new esri.tasks.GeometryService("inset URL for a geometry service");
+
+            //add the legend
+            map.on("layer-add-result", function (evt) {
+                if (evt.layer.id == "baseLayer") {
+                    var layerInfo = [{ layer: evt.layer, title: "Base Map Layer" }];
+                    //if (layerInfo.length > 0) {
+                        var legendDijit = new Legend({
+                            map: map,
+                            layerInfos: layerInfo
+                        }, "legendDiv");
+                        legendDijit.startup();
+                    //}
+                }
+            });
+            //remove graphis that are added by the geocoder
+            //this is the only way that graphics are added to the Map's graphic layer
+            map.on('load', function () {
+                map.graphics.on('graphic-add', function (graphic) {
+                    setTimeout(function () {
+                        map.graphics.clear();
+                    }, 5000);
+                });
+            });
+
+            //show or hid a "map is updating" Message
+            map.on('update-start', function () {
+                esri.show(dojo.byId("status"));
+            });
+            map.on('update-end', function () {
+                esri.hide(dojo.byId("status"));
+            });
+
+            //streetview graphic layer in the map
+            var streetViewGraphic = new GraphicsLayer({ id: 'svGraphicLayer' });
+
+            var baselayer = new ArcGISDynamicMapServiceLayer(''/*Insert URL for a dynamic Map Service Layer Here*/, { id: "baseLayer" });
+            var raster = new esri.layers.ArcGISTiledMapServiceLayer(""/*Inser URL for a Raster Layer*/, { id: "_2014", visible: true });
+
+            //add layers to the map. the first layer that is added defines the spatial reference for the map
+            map.addLayers([raster, baselayer, streetViewGraphic]);
+
+            //define this dialog in the global scope so that it can be used when the user clicks on the graphics
+            dialog = new dijit.TooltipDialog({
+                id: "tooltipDialog",
+                style: "position: absolute; font: normal normal normal 10pt Helvetica;z-index:100"
+            });
+            dialog.startup();
+
+            //Make Sure the Dialog Closes
+            map.on('extent-change', function (e) {
+                dijit.popup.close()
+            });
+
+            //IDs for the layers inthe database
+            var layers = ["StreetSigns", "Drainage"];
+            for (i = 0; i < layers.length; i++) {
+                var masterInfo = eval('(' + callASHX("getData.ashx?type=load&layer=" + layers[i]) + ')');
+                addPointLayer(masterInfo, layers[i]);
+            }
+        });
+    </script>
+</head>
+    <body class="claro">
+        <!--[if IE 7]>
+        <style>
+          html, body {
+            margin: 0;
+          }
+        </style>
+        <![endif]-->
+        
+        <div id="content" data-dojo-type="dijit/layout/BorderContainer" data-dojo-props="design:'headline', gutters:true" style="width: 100%; height: 100%; margin: 0;">
+            <div dojotype="dojox/layout/ExpandoPane" id="leftPane" region="left" splitter="true" data-dojo-props="style:'width:40%; height:100%;', startExpanded:false">
+                <div data-dojo-type="dijit/layout/ContentPane">
+                    <input id="svX" type="hidden" />
+                    <input id="svY" type="hidden" />
+                    <div id="googleInnerDiv" data-dojo-type="dijit.layout.ContentPane" class="googleInnerDiv">
+                        <div id="streetview" style="width:100%; height:100%;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="map" data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region:'center'" style="overflow:hidden;">
+                <input type="hidden" id="currentUser" value="" />
+                <div class="rightTools">
+                    <div id="editorPanel" class="editorPanel" style="display:none; padding:10px; margin:0 0 3px 0;" >
+                        <div id="editorPanelDragHandler" class="panelDragHandler" style="cursor:pointer;">EDITING</div>
+                        <div class="editorSearchInnerDiv">
+                            <div id="editorSearchInnerDiv" style="padding:5px; margin:2px;">
+                                <!--disable the other layers editing checkbox and then set the drawing toolbar enabled or disabled-->
+                                <div id="streetSigns" data-dojo-type="dijit/form/CheckBox" data-dojo-props='disabled: true, onClick:function(){ dijit.byId("drainage").set("checked", false); (this.checked ? editToolbar.activate(esri.toolbars.Draw.POINT) : editToolbar.deactivate()); }'></div>Street Signs&nbsp;|&nbsp;
+                                <div id="drainage" data-dojo-type="dijit/form/CheckBox" data-dojo-props='disabled: true, onClick:function(){ dijit.byId("streetSigns").set("checked", false);  (this.checked ? editToolbar.activate(esri.toolbars.Draw.POINT) : editToolbar.deactivate()); }'></div>Drainage
+                            </div>
+                            <div>
+                                <!--do save or delete-->
+                                <div id="saveChanges" data-dojo-type="dijit.form.Button" data-dojo-props="onClick:function(){ saveChanges(); }">Save</div>
+                                <div id="deleteChanges" data-dojo-type="dijit.form.Button" disabled data-dojo-props="onClick:function(){ deleteChanges(); }">delete</div>
+                            </div>
+                        </div>
+                        <div class="panelWindowback" ></div>
+                    </div>
+                    <div id="search"></div>
+                </div>
+                
+                <div id="verticalTools">
+                    <!--unlock editing when clicked opens a credential box-->
+                    <div id="editToggler" data-dojo-type="dijit/form/ToggleButton" data-dojo-props="checked:true, onClick:function(e){ unlockEditing(this); }" label='<img src="styles/images/lock-Icon.png" height="16" width="16">'></div>
+                    <br />
+                    <button data-dojo-type="dijit/form/DropDownButton" data-dojo-props='dropDownPosition:["after"], iconClass:"noteIcon"'>
+                        <span><img height="16" width="16" src="styles/images/layers.png" /></span>
+                        <div data-dojo-type="dijit/layout/ContentPane" style=" background-color:white;">
+                            <div id="legendDiv"></div>
+                        </div>
+                    </button>
+                    <br/>
+                    <button data-dojo-type="dijit/form/DropDownButton" data-dojo-props=''>
+                        <span><img height="16" width="16" src="styles/images/Info-icon1.png" /></span>
+                        <span data-dojo-type="dijit/Menu">
+                            <!--enable or disable the streetview / identify tools-->
+                            <span id="doSV" data-dojo-type="dijit/CheckedMenuItem" data-dojo-props='onClick:function(){ doStreetView(this); }'>Street View</span>
+                            <span id="identify" data-dojo-type="dijit/CheckedMenuItem"  data-dojo-props='onClick:function(){ doIdentify(this); }'>Identify</span>
+                        </span>
+                    </button>
+                </div>
+                <span id="status" style="position: absolute; left: 5px; bottom: 5px; display:none;">
+                    The Map is Updating...
+                </span>
+            </div>
+        </div>
+    </body>
+</html>

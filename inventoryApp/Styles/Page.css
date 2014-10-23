@@ -1,0 +1,154 @@
+﻿html, body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+}
+
+#rightPane {
+    width: 20%;
+}
+#map {
+margin:0px;
+padding:0px;
+}
+#legendPane {
+    border: solid #97DCF2 1px;
+}
+#verticalTools
+{
+    border-radius: 5px 5px 5px 5px;
+    color: rgb(255, 255, 255);
+    -moz-user-select: none;
+    position: absolute;
+    text-align: center;
+    border: 2px solid rgb(102, 102, 102);
+    background-color: rgb(102, 102, 102);
+    z-index: 50;
+    top: 45px;
+    left: 7px;
+}
+#locationTools
+{
+    position: absolute;
+    text-align: center;
+    border: 1px solid #57585A;
+    background-color: #FFF;
+    color: #4C4C4C;
+    -moz-user-select: none;
+    border-radius: 5px;
+    top: 7px;
+    left: 75px;
+    width: 60px;
+    z-index: 30;
+}
+#locationTools div
+{
+    width: 30px;
+    height: 30px;
+    background-repeat: no-repeat;
+    background-position: center center;
+}
+#locationTools div:hover
+{
+    cursor: pointer;
+    background-color: rgb(102, 102, 102);
+    opacity: 0.50;
+    filter: alpha(opacity=50);
+}
+#homeButton
+{
+    background-image: url('Images/home.png');
+    float: left;
+}
+#geolocateButton
+{
+    background-image: url('Images/locate.png');
+    float: right;
+}
+.rightTools
+{
+    position: absolute;
+    z-index: 30;
+    top: 7px;
+    left: 75px;
+}
+#map_zoom_slider
+{
+    left:7px;
+    top: 7px;
+} 
+#status
+{
+    background-color: #33CC33;
+    color: white;
+    padding: 10px;
+    margin: 5px;
+    -moz-border-radius: 5px;
+    -webkit-border-radius: 5px;
+    z-index: 10000;
+    font-size: medium;
+    font-family: 'Arial Black';
+    opacity: 0.70;
+    filter: alpha(opacity=70);
+} 
+.dragPanel
+{
+    padding: 10px;
+    position: absolute;
+    z-index: 150;
+}
+.dragPanelDrag
+{
+    position: absolute;
+    z-index: 101;
+    padding: 10px;
+    opacity: 0.5;
+    filter: alpha(opacity=50);
+}
+.editorSearchInnerDiv
+{
+    max-height:250px;
+    text-align: left;
+    border: 1px solid #C0C0C0;
+    margin: 2px;
+    background: #FFFFFF;
+    font-size: small;
+    font-family: Calibri;
+}
+ .panelWindowback
+{
+    z-index: -1;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    height: 100%;
+    left: 0;
+    background: #8CB0E1;
+    opacity: 0.9;
+    filter: alpha(opacity=90);
+} 
+.dijitDialogCloseIcon
+{
+    display:none;
+}
+.closePanelButton
+{
+    padding: 2px;
+    border: 1px outset #C0C0C0;
+    position: absolute;
+    color: #FFFFFF;
+    font-family: tahoma;
+    font-size: small;
+    background-color: #CC0000;
+    top: 18px;
+    right: 8px;
+    text-align: center;
+    width: 15px;
+    cursor: pointer;
+    font-weight: bolder;
+    z-index: 151;
+} 
+.closePanelButton:hover
+{
+    border-style: inset;
+} 
